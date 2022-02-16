@@ -1,0 +1,9 @@
+[package]
+name = "cellvec"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+
+[[example]]
+name = "game"
