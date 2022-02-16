@@ -12,6 +12,7 @@ struct Slot<T> {
 }
 
 impl<T> Slot<T> {
+    #[must_use]
     fn new(version: i32) -> Self {
         Self {
             elem:    UnsafeCell::new(MaybeUninit::uninit()),
@@ -19,6 +20,7 @@ impl<T> Slot<T> {
         }
     }
 
+    #[must_use]
     unsafe fn get(&self) -> &T { (*self.elem.get()).assume_init_ref() }
 }
 
@@ -46,6 +48,8 @@ impl<'t, T> CellVecRef<'t, T> {
 
 impl<'t, T> Deref for CellVecRef<'t, T> {
     type Target = T;
+
+    #[must_use]
     fn deref(&self) -> &Self::Target { unsafe { self.slot.get() } }
 }
 

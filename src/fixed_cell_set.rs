@@ -1,5 +1,5 @@
 use crate::clear::Clear;
-use std::{cell::Cell, mem::MaybeUninit};
+use std::cell::Cell;
 
 type Slot<T> = Cell<Option<T>>;
 
@@ -8,20 +8,12 @@ pub struct FixedCellSet<T, const CAP: usize> {
     first: Cell<usize>,
 }
 
-impl<T, const CAP: usize> Default for FixedCellSet<T, CAP> {
+impl<T: Sized, const CAP: usize> Default for FixedCellSet<T, CAP> {
     #[must_use]
     fn default() -> Self {
-        let mut slots: MaybeUninit<[Cell<Option<T>>; CAP]> = MaybeUninit::uninit();
-
-        unsafe {
-            for i in 0..CAP {
-                (*slots.as_mut_ptr())[i] = Cell::default();
-            }
-
-            Self {
-                slots: slots.assume_init(),
-                first: Cell::new(CAP),
-            }
+        Self {
+            slots: array_init::array_init(|_| Cell::default()),
+            first: Cell::new(CAP),
         }
     }
 }
@@ -39,7 +31,7 @@ impl<T, const CAP: usize> FixedCellSet<T, CAP> {
     pub fn remove(&self, index: usize) -> T {
         let first = self.first.get();
         let slot = &self.slots[first + index];
-        let elem = slot.take().unwrap();
+        let elem = unsafe { slot.take().unwrap_unchecked() };
         slot.set(self.slots[first].take());
         self.first.set(first + 1);
         elem
@@ -57,19 +49,44 @@ impl<T, const CAP: usize> FixedCellSet<T, CAP> {
         slot.set(Some(elem));
         Some(0)
     }
+
+    pub fn retain<F>(&self, f: impl Fn(&T) -> bool) {
+        for i in self.first.get()..CAP {
+            let c = unsafe { self.slots.get_unchecked(i) };
+            let v = unsafe { c.take().unwrap_unchecked() };
+
+            if !f(&v) {
+                self.remove(i);
+            } else {
+                c.set(Some(v));
+            }
+        }
+    }
 }
 
 impl<T: Copy, const CAP: usize> FixedCellSet<T, CAP> {
     #[must_use]
     pub fn get(&self, index: usize) -> Option<T> { self.slots.get(self.first.get() + index).and_then(|s| s.get()) }
-    pub fn iter(&self) -> impl Iterator<Item = T> + '_ { self.slots.iter().filter_map(|c| c.get()) }
 
-    pub fn retain<F>(&self, f: impl Fn(&T) -> bool) {
-        for i in self.first.get()..CAP {
-            if !f(&self.slots[i].get().unwrap()) {
-                self.remove(i);
-            }
-        }
+    pub fn iter(&self) -> impl Iterator<Item = T> + '_ { self.slots.iter().filter_map(|c| c.get()) }
+}
+
+impl<T: Clone, const CAP: usize> FixedCellSet<T, CAP> {
+    #[must_use]
+    pub fn get_clone(&self, index: usize) -> Option<T> {
+        self.slots.get(self.first.get() + index).and_then(|s| {
+            let v = s.take();
+            s.set(v.clone());
+            v
+        })
+    }
+
+    pub fn iter_clone(&self) -> impl Iterator<Item = T> + '_ {
+        self.slots.iter().filter_map(|c| {
+            let v = c.take();
+            c.set(v.clone());
+            v
+        })
     }
 }
 
