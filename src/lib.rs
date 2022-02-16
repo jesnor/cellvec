@@ -1,3 +1,4 @@
+pub mod cell_set;
 pub mod cell_vec;
 pub mod clear;
 pub mod fixed_cell_set;
