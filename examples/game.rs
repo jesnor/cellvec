@@ -1,5 +1,6 @@
 use cellvec::{
     cell_vec::{CellVec, CellVecRef},
+    clear::Clear,
     fixed_cell_set::FixedCellSet,
     ptr::Ptr,
 };
@@ -12,6 +13,13 @@ struct Player<'t> {
 }
 
 type PlayerRef<'t> = CellVecRef<'t, Player<'t>>;
+
+impl<'t> Clear for Player<'t> {
+    fn clear(&self) {
+        self.name.borrow_mut().clear();
+        self.friends.clear();
+    }
+}
 
 struct Game<'t> {
     players: CellVec<Player<'t>>,
@@ -26,16 +34,16 @@ impl<'t> Game<'t> {
         }
     }
 
-    fn init(&'t self) {
-        self.players.init(|_| Player {
-            game:    self.into(),
-            name:    Default::default(),
-            friends: Default::default(),
-        });
-    }
-
     fn add_player(&'t self, name: &str) -> PlayerRef<'t> {
-        let p = self.players.alloc().unwrap();
+        let p = self
+            .players
+            .alloc(|| Player {
+                game:    self.into(),
+                name:    Default::default(),
+                friends: Default::default(),
+            })
+            .unwrap();
+
         *(p.name.borrow_mut()) = name.to_owned();
         p
     }
@@ -43,7 +51,6 @@ impl<'t> Game<'t> {
 
 fn main() {
     let game = Game::new(100);
-    game.init();
     let p1 = game.add_player("Sune");
     let p2 = game.add_player("Berra");
     let index = p1.friends.insert(p2).unwrap();

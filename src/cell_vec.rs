@@ -95,6 +95,7 @@ pub struct CellVec<T> {
     len:        Cell<i32>,
     version:    Cell<i32>,
     last:       Cell<i32>,
+    last_init:  Cell<i32>,
 }
 
 impl<T> CellVec<T> {
@@ -104,17 +105,10 @@ impl<T> CellVec<T> {
             slots:      (0..cap).map(|i| Slot::new(-(i as i32 + 2))).collect(),
             first_free: Cell::new(0),
             len:        Cell::new(0),
-            version:    Cell::new(-1),
+            version:    Cell::new(0),
             last:       Cell::new(0),
+            last_init:  Cell::new(0),
         }
-    }
-
-    pub fn init(&self, f: impl Fn(usize) -> T) {
-        for (i, slot) in self.slots.iter().enumerate() {
-            unsafe { (*slot.elem.get()).write(f(i)) };
-        }
-
-        self.version.set(0);
     }
 
     #[must_use]
@@ -153,16 +147,21 @@ impl<T> CellVec<T> {
     }
 
     #[must_use]
-    pub fn alloc(&self) -> Option<CellVecRef<T>> {
+    pub fn alloc(&self, factory: impl FnOnce() -> T) -> Option<CellVecRef<T>> {
         let index = self.first_free.get();
         let v = self.version.get();
-        assert!(v >= 0); // Make sure we're initialized
 
         if let Some(slot) = self.slots.get(index as usize) {
             self.first_free.set(-slot.version.get() - 1);
             self.version.set(v.wrapping_add(1) & i32::MAX);
             slot.version.set(v);
             self.last.set(self.last.get().max(index + 1));
+
+            if index >= self.last_init.get() {
+                self.last_init.set(index);
+                unsafe { (*slot.elem.get()).write(factory()) };
+            }
+
             Some(CellVecRef::new(slot, v))
         } else {
             None
