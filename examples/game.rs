@@ -44,7 +44,7 @@ impl<'t> Game<'t> {
             })
             .unwrap();
 
-        p.name.set(name);
+        p.name.set(name.into());
         p
     }
 }
