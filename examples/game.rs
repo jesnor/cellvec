@@ -3,12 +3,12 @@ use cellvec::{
     clear::Clear,
     ptr::Ptr,
     slot_pool::{CellVecRef, SlotPool, VecSlotPool},
+    string_cell::StringCell,
 };
-use std::cell::RefCell;
 
 struct Player<'t> {
     game:    GameRef<'t>,
-    name:    RefCell<String>,
+    name:    StringCell,
     friends: ArrayCellSet<PlayerRef<'t>, 10>,
 }
 
@@ -16,7 +16,7 @@ type PlayerRef<'t> = CellVecRef<'t, Player<'t>>;
 
 impl<'t> Clear for Player<'t> {
     fn clear(&self) {
-        self.name.borrow_mut().clear();
+        self.name.clear();
         self.friends.clear();
     }
 }
@@ -44,7 +44,7 @@ impl<'t> Game<'t> {
             })
             .unwrap();
 
-        *(p.name.borrow_mut()) = name.to_owned();
+        p.name.set(name);
         p
     }
 }
@@ -59,10 +59,10 @@ fn main() {
     assert_eq!(p1.friends.get(index), Some(p2));
 
     for p in game.players.iter() {
-        println!("{}", p.name.borrow());
+        println!("{}", p.name);
 
         for f in p.friends.iter() {
-            println!("  {}", f.name.borrow());
+            println!("  {}", f.name);
         }
 
         println!();
