@@ -1,27 +1,27 @@
 use crate::clear::Clear;
 use std::fmt::Debug;
+use std::marker::PhantomData;
 use std::{
     cell::{Cell, UnsafeCell},
     mem::MaybeUninit,
     ops::Deref,
 };
 
-struct Slot<T> {
+pub struct Slot<T> {
     elem:    UnsafeCell<MaybeUninit<T>>,
     version: Cell<i32>,
 }
 
 impl<T> Slot<T> {
     #[must_use]
-    fn new(version: i32) -> Self {
+    unsafe fn get(&self) -> &T { (*self.elem.get()).assume_init_ref() }
+
+    fn default() -> Self {
         Self {
             elem:    UnsafeCell::new(MaybeUninit::uninit()),
-            version: Cell::new(version),
+            version: Default::default(),
         }
     }
-
-    #[must_use]
-    unsafe fn get(&self) -> &T { (*self.elem.get()).assume_init_ref() }
 }
 
 pub struct CellVecRef<'t, T> {
@@ -89,35 +89,58 @@ impl<'t, T> Debug for CellVecRef<'t, T> {
     }
 }
 
-pub struct CellVec<T> {
-    slots:      Vec<Slot<T>>,
+pub struct SlotPool<T, A> {
+    slots:      A,
     first_free: Cell<i32>,
     len:        Cell<i32>,
     version:    Cell<i32>,
     last:       Cell<i32>,
     last_init:  Cell<i32>,
+    _phantom:   PhantomData<fn(T) -> T>,
 }
 
-impl<T> CellVec<T> {
+pub type VecSlotPool<T> = SlotPool<T, Vec<Slot<T>>>;
+pub type ArraySlotPool<T, const CAP: usize> = SlotPool<T, [Slot<T>; CAP]>;
+
+impl<T> SlotPool<T, Vec<Slot<T>>> {
     #[must_use]
-    pub fn with_capacity(cap: usize) -> Self {
+    pub fn new_vec(cap: usize) -> Self {
+        let mut v = Vec::with_capacity(cap);
+        v.resize_with(v.capacity(), Slot::default);
+        Self::new(v)
+    }
+}
+
+impl<T, const CAP: usize> SlotPool<T, [Slot<T>; CAP]> {
+    #[must_use]
+    pub fn new_array() -> Self { Self::new(array_init::array_init(|_| Slot::default())) }
+}
+
+impl<T, A: AsRef<[Slot<T>]>> SlotPool<T, A> {
+    #[must_use]
+    pub fn new(slots: A) -> Self {
+        for (i, slot) in slots.as_ref().iter().enumerate() {
+            slot.version.set(-(i as i32 + 2));
+        }
+
         Self {
-            slots:      (0..cap).map(|i| Slot::new(-(i as i32 + 2))).collect(),
+            slots,
             first_free: Cell::new(0),
-            len:        Cell::new(0),
-            version:    Cell::new(0),
-            last:       Cell::new(0),
-            last_init:  Cell::new(0),
+            len: Cell::new(0),
+            version: Cell::new(0),
+            last: Cell::new(0),
+            last_init: Cell::new(0),
+            _phantom: Default::default(),
         }
     }
 
     #[must_use]
     pub fn get(&self, index: usize) -> Option<&T> {
-        self.slots.get(index).and_then(|e| if e.version.get() >= 0 { Some(unsafe { e.get() }) } else { None })
+        self.slots.as_ref().get(index).and_then(|e| if e.version.get() >= 0 { Some(unsafe { e.get() }) } else { None })
     }
 
     pub fn iter(&self) -> impl Iterator<Item = &T> {
-        self.slots.iter().take(self.last.get() as usize).filter_map(|e| {
+        self.slots.as_ref().iter().take(self.last.get() as usize).filter_map(|e| {
             if e.version.get() >= 0 {
                 Some(unsafe { e.get() })
             } else {
@@ -133,13 +156,13 @@ impl<T> CellVec<T> {
     pub fn is_empty(&self) -> bool { self.len() == 0 }
 
     #[must_use]
-    pub fn capacity(&self) -> usize { self.slots.capacity() }
+    pub fn capacity(&self) -> usize { self.slots.as_ref().len() }
 
     #[must_use]
     fn index_of(&self, slot: &Slot<T>) -> usize {
-        let index = unsafe { (slot as *const Slot<T>).offset_from(self.slots.as_ptr() as *const Slot<T>) };
+        let index = unsafe { (slot as *const Slot<T>).offset_from(self.slots.as_ref().as_ptr() as *const Slot<T>) };
 
-        if index < 0 || index as usize >= self.slots.len() {
+        if index < 0 || index as usize >= self.capacity() {
             panic!();
         }
 
@@ -151,7 +174,7 @@ impl<T> CellVec<T> {
         let index = self.first_free.get();
         let v = self.version.get();
 
-        if let Some(slot) = self.slots.get(index as usize) {
+        if let Some(slot) = self.slots.as_ref().get(index as usize) {
             self.first_free.set(-slot.version.get() - 1);
             self.version.set(v.wrapping_add(1) & i32::MAX);
             slot.version.set(v);
@@ -169,7 +192,7 @@ impl<T> CellVec<T> {
     }
 }
 
-impl<T: Clear> CellVec<T> {
+impl<T: Clear, A: AsRef<[Slot<T>]>> SlotPool<T, A> {
     pub fn remove(&self, r: &CellVecRef<T>) {
         if r.is_valid() {
             let index = self.index_of(r.slot);
@@ -182,10 +205,10 @@ impl<T: Clear> CellVec<T> {
     }
 }
 
-impl<T: Clear> Clear for CellVec<T> {
+impl<T: Clear, A: AsRef<[Slot<T>]>> Clear for SlotPool<T, A> {
     fn clear(&self) {
         for i in 0..self.last.get() {
-            let slot = unsafe { self.slots.get_unchecked(i as usize) };
+            let slot = unsafe { self.slots.as_ref().get_unchecked(i as usize) };
 
             if slot.version.get() >= 0 {
                 unsafe { slot.get().clear() };
@@ -197,4 +220,8 @@ impl<T: Clear> Clear for CellVec<T> {
         self.len.set(0);
         self.last.set(0);
     }
+}
+
+impl<T, const CAP: usize> Default for SlotPool<T, [Slot<T>; CAP]> {
+    fn default() -> Self { Self::new_array() }
 }

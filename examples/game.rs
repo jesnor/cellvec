@@ -1,15 +1,15 @@
 use cellvec::{
-    cell_vec::{CellVec, CellVecRef},
+    cell_set::ArrayCellSet,
     clear::Clear,
-    fixed_cell_set::FixedCellSet,
     ptr::Ptr,
+    slot_pool::{CellVecRef, SlotPool, VecSlotPool},
 };
 use std::cell::RefCell;
 
 struct Player<'t> {
     game:    GameRef<'t>,
     name:    RefCell<String>,
-    friends: FixedCellSet<PlayerRef<'t>, 10>,
+    friends: ArrayCellSet<PlayerRef<'t>, 10>,
 }
 
 type PlayerRef<'t> = CellVecRef<'t, Player<'t>>;
@@ -22,7 +22,7 @@ impl<'t> Clear for Player<'t> {
 }
 
 struct Game<'t> {
-    players: CellVec<Player<'t>>,
+    players: VecSlotPool<Player<'t>>,
 }
 
 type GameRef<'t> = Ptr<&'t Game<'t>>;
@@ -30,7 +30,7 @@ type GameRef<'t> = Ptr<&'t Game<'t>>;
 impl<'t> Game<'t> {
     fn new(player_cap: usize) -> Self {
         Self {
-            players: CellVec::with_capacity(player_cap),
+            players: SlotPool::new_vec(player_cap),
         }
     }
 

@@ -1,11 +1,11 @@
-use cellvec::{cell_set::CellSet, fixed_cell_set::FixedCellSet};
+use cellvec::cell_set::{ArrayCellSet, CellSet, VecCellSet};
 use std::{cell::RefCell, rc::Rc};
 
 #[derive(Debug)]
 struct Player {
     game:    GameRef,
     name:    RefCell<String>,
-    friends: FixedCellSet<PlayerRef, 10>,
+    friends: ArrayCellSet<PlayerRef, 10>,
 }
 
 type PlayerRef = Rc<Player>;
@@ -16,7 +16,7 @@ impl PartialEq for Player {
 
 #[derive(Debug)]
 struct Game {
-    players: CellSet<PlayerRef>,
+    players: VecCellSet<PlayerRef>,
 }
 
 type GameRef = Rc<Game>;
@@ -24,7 +24,7 @@ type GameRef = Rc<Game>;
 impl Game {
     fn new(player_cap: usize) -> Self {
         Self {
-            players: CellSet::new(player_cap),
+            players: CellSet::new_vec(player_cap),
         }
     }
 
