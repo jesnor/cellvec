@@ -1,5 +1,6 @@
 use crate::cell_trait::CellTrait;
 use crate::clear::Clear;
+use crate::refs::WeakRefTrait;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::ptr;
@@ -46,7 +47,6 @@ impl<'t, T> StrongRef<'t, T> {
         Self { slot }
     }
 
-    pub fn downgrade(&self) -> WeakRef<'t, T> { self.weak() }
     pub fn weak(&self) -> WeakRef<'t, T> { WeakRef::new(self.slot) }
 }
 
@@ -71,6 +71,11 @@ impl<'t, T> TryFrom<WeakRef<'t, T>> for StrongRef<'t, T> {
     }
 }
 
+impl<'t, T> crate::refs::StrongRefTrait for StrongRef<'t, T> {
+    type Weak = WeakRef<'t, T>;
+    fn downgrade(&self) -> WeakRef<'t, T> { self.weak() }
+}
+
 pub struct WeakRef<'t, T> {
     slot:    &'t Slot<T>,
     version: i32,
@@ -86,19 +91,7 @@ impl<'t, T> WeakRef<'t, T> {
     }
 
     #[must_use]
-    pub fn is_valid(&self) -> bool { self.version == self.slot.version.get() }
-
-    #[must_use]
     pub fn get(&self) -> Option<StrongRef<'t, T>> {
-        if self.is_valid() {
-            Some(StrongRef::new(self.slot))
-        } else {
-            None
-        }
-    }
-
-    #[must_use]
-    pub fn upgrade(&self) -> Option<StrongRef<'t, T>> {
         if self.is_valid() {
             Some(StrongRef::new(self.slot))
         } else {
@@ -107,8 +100,25 @@ impl<'t, T> WeakRef<'t, T> {
     }
 }
 
+impl<'t, T> WeakRefTrait for WeakRef<'t, T> {
+    type Target = T;
+    type Strong = StrongRef<'t, T>;
+
+    #[must_use]
+    fn upgrade(&self) -> Option<StrongRef<'t, T>> {
+        if self.is_valid() {
+            Some(StrongRef::new(self.slot))
+        } else {
+            None
+        }
+    }
+
+    #[must_use]
+    fn is_valid(&self) -> bool { self.version == self.slot.version.get() }
+}
+
 impl<'t, T> From<StrongRef<'t, T>> for WeakRef<'t, T> {
-    fn from(r: StrongRef<'t, T>) -> Self { r.downgrade() }
+    fn from(r: StrongRef<'t, T>) -> Self { r.weak() }
 }
 
 impl<'t, T> PartialEq for WeakRef<'t, T> {

@@ -5,6 +5,7 @@ use cellvec::{
     mcell::MCell,
     ptr::Ptr,
     rc_pool::{RcPool, StrongRef, VecRcPool, WeakRef},
+    refs::StrongRefTrait,
 };
 use std::cell::Cell;
 
