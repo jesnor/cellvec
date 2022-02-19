@@ -1,6 +1,8 @@
+use crate::cell_trait::CellTrait;
 use crate::clear::Clear;
 use std::fmt::Debug;
 use std::marker::PhantomData;
+use std::ptr;
 use std::{
     cell::{Cell, UnsafeCell},
     mem::MaybeUninit,
@@ -8,8 +10,9 @@ use std::{
 };
 
 pub struct Slot<T> {
-    elem:    UnsafeCell<MaybeUninit<T>>,
-    version: Cell<i32>,
+    elem:      UnsafeCell<MaybeUninit<T>>,
+    version:   Cell<i32>,
+    ref_count: Cell<u32>,
 }
 
 impl<T> Slot<T> {
@@ -18,50 +21,105 @@ impl<T> Slot<T> {
 
     fn default() -> Self {
         Self {
-            elem:    UnsafeCell::new(MaybeUninit::uninit()),
-            version: Default::default(),
+            elem:      UnsafeCell::new(MaybeUninit::uninit()),
+            version:   Default::default(),
+            ref_count: Default::default(),
         }
+    }
+
+    fn drop_elem(&self) {
+        if self.ref_count.get() > 0 {
+            panic!("Trying to remove item with references!")
+        }
+
+        unsafe { ptr::drop_in_place(self.elem.get()) };
     }
 }
 
-pub struct SlotPoolRef<'t, T> {
+pub struct StrongRef<'t, T> {
+    slot: &'t Slot<T>,
+}
+
+impl<'t, T> StrongRef<'t, T> {
+    fn new(slot: &'t Slot<T>) -> Self {
+        slot.ref_count.add(1);
+        Self { slot }
+    }
+
+    pub fn downgrade(&self) -> WeakRef<'t, T> { self.weak() }
+    pub fn weak(&self) -> WeakRef<'t, T> { WeakRef::new(self.slot) }
+}
+
+impl<'t, T> Clone for StrongRef<'t, T> {
+    fn clone(&self) -> Self { Self::new(self.slot) }
+}
+
+impl<'t, T> Deref for StrongRef<'t, T> {
+    type Target = T;
+    fn deref(&self) -> &Self::Target { unsafe { self.slot.get() } }
+}
+
+impl<'t, T> Drop for StrongRef<'t, T> {
+    fn drop(&mut self) { self.slot.ref_count.sub(1) }
+}
+
+impl<'t, T> TryFrom<WeakRef<'t, T>> for StrongRef<'t, T> {
+    type Error = String;
+
+    fn try_from(value: WeakRef<'t, T>) -> Result<Self, Self::Error> {
+        value.get().ok_or_else(|| "Element removed!".into())
+    }
+}
+
+pub struct WeakRef<'t, T> {
     slot:    &'t Slot<T>,
     version: i32,
 }
 
-impl<'t, T> SlotPoolRef<'t, T> {
+impl<'t, T> WeakRef<'t, T> {
     #[must_use]
-    fn new(slot: &'t Slot<T>, version: i32) -> Self { Self { slot, version } }
+    fn new(slot: &'t Slot<T>) -> Self {
+        Self {
+            slot,
+            version: slot.version.get(),
+        }
+    }
 
     #[must_use]
     pub fn is_valid(&self) -> bool { self.version == self.slot.version.get() }
 
     #[must_use]
-    pub fn get(&self) -> Option<&'t T> {
-        if self.version == self.slot.version.get() {
-            Some(unsafe { self.slot.get() })
+    pub fn get(&self) -> Option<StrongRef<'t, T>> {
+        if self.is_valid() {
+            Some(StrongRef::new(self.slot))
+        } else {
+            None
+        }
+    }
+
+    #[must_use]
+    pub fn upgrade(&self) -> Option<StrongRef<'t, T>> {
+        if self.is_valid() {
+            Some(StrongRef::new(self.slot))
         } else {
             None
         }
     }
 }
 
-impl<'t, T> Deref for SlotPoolRef<'t, T> {
-    type Target = T;
-
-    #[must_use]
-    fn deref(&self) -> &Self::Target { unsafe { self.slot.get() } }
+impl<'t, T> From<StrongRef<'t, T>> for WeakRef<'t, T> {
+    fn from(r: StrongRef<'t, T>) -> Self { r.downgrade() }
 }
 
-impl<'t, T> PartialEq for SlotPoolRef<'t, T> {
+impl<'t, T> PartialEq for WeakRef<'t, T> {
     fn eq(&self, other: &Self) -> bool {
         std::ptr::eq(self.slot as *const Slot<T>, other.slot as *const Slot<T>) && self.version == other.version
     }
 }
 
-impl<'t, T> Eq for SlotPoolRef<'t, T> {}
+impl<'t, T> Eq for WeakRef<'t, T> {}
 
-impl<'t, T> Clone for SlotPoolRef<'t, T> {
+impl<'t, T> Clone for WeakRef<'t, T> {
     #[must_use]
     fn clone(&self) -> Self {
         Self {
@@ -71,16 +129,16 @@ impl<'t, T> Clone for SlotPoolRef<'t, T> {
     }
 }
 
-impl<'t, T> Copy for SlotPoolRef<'t, T> {}
+impl<'t, T> Copy for WeakRef<'t, T> {}
 
-impl<'t, T> std::hash::Hash for SlotPoolRef<'t, T> {
+impl<'t, T> std::hash::Hash for WeakRef<'t, T> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         (self.slot as *const Slot<T>).hash(state);
         self.version.hash(state);
     }
 }
 
-impl<'t, T> Debug for SlotPoolRef<'t, T> {
+impl<'t, T> Debug for WeakRef<'t, T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("CellVecRef")
             .field("slot", &(self.slot as *const Slot<T>))
@@ -89,20 +147,19 @@ impl<'t, T> Debug for SlotPoolRef<'t, T> {
     }
 }
 
-pub struct SlotPool<T, A> {
+pub struct RcPool<T, A> {
     slots:      A,
     first_free: Cell<i32>,
     len:        Cell<i32>,
     version:    Cell<i32>,
     last:       Cell<i32>,
-    last_init:  Cell<i32>,
     _phantom:   PhantomData<fn(T) -> T>,
 }
 
-pub type VecSlotPool<T> = SlotPool<T, Vec<Slot<T>>>;
-pub type ArraySlotPool<T, const CAP: usize> = SlotPool<T, [Slot<T>; CAP]>;
+pub type VecRcPool<T> = RcPool<T, Vec<Slot<T>>>;
+pub type ArrayRcPool<T, const CAP: usize> = RcPool<T, [Slot<T>; CAP]>;
 
-impl<T> SlotPool<T, Vec<Slot<T>>> {
+impl<T> RcPool<T, Vec<Slot<T>>> {
     #[must_use]
     pub fn new_vec(cap: usize) -> Self {
         let mut v = Vec::with_capacity(cap);
@@ -111,12 +168,12 @@ impl<T> SlotPool<T, Vec<Slot<T>>> {
     }
 }
 
-impl<T, const CAP: usize> SlotPool<T, [Slot<T>; CAP]> {
+impl<T, const CAP: usize> RcPool<T, [Slot<T>; CAP]> {
     #[must_use]
     pub fn new_array() -> Self { Self::new(array_init::array_init(|_| Slot::default())) }
 }
 
-impl<T, A: AsRef<[Slot<T>]>> SlotPool<T, A> {
+impl<T, A: AsRef<[Slot<T>]>> RcPool<T, A> {
     #[must_use]
     pub fn new(slots: A) -> Self {
         for (i, slot) in slots.as_ref().iter().enumerate() {
@@ -129,7 +186,6 @@ impl<T, A: AsRef<[Slot<T>]>> SlotPool<T, A> {
             len: Cell::new(0),
             version: Cell::new(0),
             last: Cell::new(0),
-            last_init: Cell::new(0),
             _phantom: Default::default(),
         }
     }
@@ -170,7 +226,7 @@ impl<T, A: AsRef<[Slot<T>]>> SlotPool<T, A> {
     }
 
     #[must_use]
-    pub fn alloc(&self, factory: impl FnOnce() -> T) -> Option<SlotPoolRef<T>> {
+    pub fn insert(&self, value: T) -> Option<StrongRef<T>> {
         let index = self.first_free.get();
         let v = self.version.get();
 
@@ -179,49 +235,40 @@ impl<T, A: AsRef<[Slot<T>]>> SlotPool<T, A> {
             self.version.set(v.wrapping_add(1) & i32::MAX);
             slot.version.set(v);
             self.last.set(self.last.get().max(index + 1));
-
-            if index >= self.last_init.get() {
-                self.last_init.set(index);
-                unsafe { (*slot.elem.get()).write(factory()) };
-            }
-
-            Some(SlotPoolRef::new(slot, v))
+            unsafe { (*slot.elem.get()).write(value) };
+            Some(StrongRef::new(slot))
         } else {
             None
         }
     }
-}
 
-impl<T: Clear, A: AsRef<[Slot<T>]>> SlotPool<T, A> {
-    pub fn remove(&self, r: &SlotPoolRef<T>) {
+    pub fn remove(&self, r: &WeakRef<T>) {
         if r.is_valid() {
             let index = self.index_of(r.slot);
             let ff = self.first_free.get();
-            r.slot.version.set(-ff - 1);
-            r.clear();
             self.first_free.set(index as i32);
             self.last.set(self.last.get().min(index as i32 + 1));
+            r.slot.version.set(-ff - 1);
+            r.slot.drop_elem();
         }
     }
 }
 
-impl<T: Clear, A: AsRef<[Slot<T>]>> Clear for SlotPool<T, A> {
+impl<T: Clear, A: AsRef<[Slot<T>]>> Clear for RcPool<T, A> {
     fn clear(&self) {
-        for i in 0..self.last.get() {
-            let slot = unsafe { self.slots.as_ref().get_unchecked(i as usize) };
-
-            if slot.version.get() >= 0 {
-                unsafe { slot.get().clear() };
-                slot.version.set(-(i as i32 + 2));
-            }
-        }
-
+        let last = self.last.get();
         self.first_free.set(0);
         self.len.set(0);
         self.last.set(0);
+
+        for i in 0..last {
+            let slot = unsafe { self.slots.as_ref().get_unchecked(i as usize) };
+            slot.version.set(-(i as i32 + 2));
+            slot.drop_elem();
+        }
     }
 }
 
-impl<T, const CAP: usize> Default for SlotPool<T, [Slot<T>; CAP]> {
+impl<T, const CAP: usize> Default for RcPool<T, [Slot<T>; CAP]> {
     fn default() -> Self { Self::new_array() }
 }

@@ -4,7 +4,7 @@ use cellvec::{
     clear::Clear,
     mcell::MCell,
     ptr::Ptr,
-    slot_pool::{SlotPoolRef, SlotPool, VecSlotPool},
+    rc_pool::{RcPool, StrongRef, VecRcPool, WeakRef},
 };
 use std::cell::Cell;
 
@@ -16,17 +16,18 @@ struct Player<'t> {
 }
 
 impl<'t> Player<'t> {
-    fn new(game: GameRef<'t>) -> Self {
+    fn new(game: GameRef<'t>, name: &str) -> Self {
         Self {
             game,
-            name: Default::default(),
+            name: name.to_owned().into(),
             health: Default::default(),
             friends: Default::default(),
         }
     }
 }
 
-type PlayerRef<'t> = SlotPoolRef<'t, Player<'t>>;
+type PlayerRef<'t> = WeakRef<'t, Player<'t>>;
+type PlayerStrongRef<'t> = StrongRef<'t, Player<'t>>;
 
 impl<'t> Clear for Player<'t> {
     fn clear(&self) {
@@ -36,7 +37,7 @@ impl<'t> Clear for Player<'t> {
 }
 
 struct Game<'t> {
-    players: VecSlotPool<Player<'t>>,
+    players: VecRcPool<Player<'t>>,
 }
 
 type GameRef<'t> = Ptr<&'t Game<'t>>;
@@ -44,14 +45,12 @@ type GameRef<'t> = Ptr<&'t Game<'t>>;
 impl<'t> Game<'t> {
     fn new(player_cap: usize) -> Self {
         Self {
-            players: SlotPool::new_vec(player_cap),
+            players: RcPool::new_vec(player_cap),
         }
     }
 
-    fn add_player(&'t self, name: &str) -> PlayerRef<'t> {
-        let p = self.players.alloc(|| Player::new(Ptr::new(self))).unwrap();
-        p.name.set(name.into());
-        p
+    fn add_player(&'t self, name: &str) -> PlayerStrongRef<'t> {
+        self.players.insert(Player::new(Ptr::new(self), name)).unwrap()
     }
 }
 
@@ -59,10 +58,10 @@ fn main() {
     let game = Game::new(100);
     let p1 = game.add_player("Sune");
     let p2 = game.add_player("Berra");
-    let index = p1.friends.insert(p2).unwrap();
-    p2.friends.insert(p1).unwrap();
+    let index = p1.friends.insert(p2.downgrade()).unwrap();
+    p2.friends.insert(p1.downgrade()).unwrap();
     assert_eq!(p1.game, p2.game);
-    assert_eq!(p1.friends.get(index), Some(p2));
+    //assert_eq!(p1.friends.get(index), Some(p2));
 
     p1.name.add(" Sunesson");
     p1.health.add(10);
@@ -72,7 +71,9 @@ fn main() {
             println!("{}", p.name);
 
             for f in p.friends.iter() {
-                println!("  {}", f.name);
+                if let Some(f) = f.get() {
+                    println!("  {}", f.name);
+                }
             }
 
             println!();

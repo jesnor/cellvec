@@ -1,11 +1,12 @@
-use crate::clear::Clear;
+use crate::mcell::MCell;
+use crate::{cell_trait::CellTrait, clear::Clear};
 use std::{cell::Cell, fmt::Debug, marker::PhantomData};
 
 pub type Slot<T> = Cell<Option<T>>;
 
 pub struct CellSet<T, A> {
     slots:    A,
-    first:    Cell<usize>,
+    first:    MCell<usize>,
     _phantom: PhantomData<fn(T) -> T>,
 }
 
@@ -31,7 +32,7 @@ impl<T, A: AsRef<[Slot<T>]>> CellSet<T, A> {
 
         Self {
             slots,
-            first: Cell::new(l),
+            first: l.into(),
             _phantom: Default::default(),
         }
     }
@@ -93,19 +94,11 @@ impl<T: Copy, A: AsRef<[Slot<T>]>> CellSet<T, A> {
 impl<T: Clone, A: AsRef<[Slot<T>]>> CellSet<T, A> {
     #[must_use]
     pub fn get_clone(&self, index: usize) -> Option<T> {
-        self.slots.as_ref().get(self.first.get() + index).and_then(|s| {
-            let v = s.take();
-            s.set(v.clone());
-            v
-        })
+        self.slots.as_ref().get(self.first.get() + index).and_then(|s| s.get_clone())
     }
 
     pub fn iter_clone(&self) -> impl Iterator<Item = T> + '_ {
-        self.slots.as_ref()[self.first.get()..].iter().filter_map(|c| {
-            let v = c.take();
-            c.set(v.clone());
-            v
-        })
+        self.slots.as_ref()[self.first.get()..].iter().filter_map(|c| c.get_clone())
     }
 }
 

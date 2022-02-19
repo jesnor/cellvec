@@ -13,4 +13,20 @@ name = "cellvec"
 version = "0.1.0"
 dependencies = [
  "array-init",
+ "qcell",
+]
+
+[[package]]
+name = "once_cell"
+version = "1.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "da32515d9f6e6e489d7bc9d84c71b060db7247dc035bbe44eac88cf87486d8d5"
+
+[[package]]
+name = "qcell"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e5023f06b72bfa9fbb5ebdbe891f02db9406ba026990e0778f80094bc84f3ac8"
+dependencies = [
+ "once_cell",
 ]
