@@ -3,7 +3,10 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use crate::mcell::MCell;
+use crate::{
+    mcell::MCell,
+    rc_pool::{StrongRef, WeakRef},
+};
 
 /// # Safety
 /// Only implemented for types where their implementations of the standard library traits doesn't
@@ -30,6 +33,8 @@ unsafe impl SafeTraits for bool {}
 
 unsafe impl<T> SafeTraits for Rc<T> {}
 unsafe impl<T> SafeTraits for Weak<T> {}
+unsafe impl<'t, T> SafeTraits for StrongRef<'t, T> {}
+unsafe impl<'t, T> SafeTraits for WeakRef<'t, T> {}
 
 unsafe impl<T: SafeTraits> SafeTraits for Option<T> {}
 unsafe impl<T: SafeTraits> SafeTraits for Cell<T> {}

@@ -1,4 +1,6 @@
 use crate::mcell::MCell;
+use crate::rc_pool::{StrongRef, WeakRef};
+use crate::refs::WeakRefTrait;
 use crate::{cell_trait::CellTrait, clear::Clear};
 use std::{cell::Cell, fmt::Debug, marker::PhantomData};
 
@@ -100,6 +102,10 @@ impl<T: Clone, A: AsRef<[Slot<T>]>> CellSet<T, A> {
     pub fn iter_clone(&self) -> impl Iterator<Item = T> + '_ {
         self.slots.as_ref()[self.first.get()..].iter().filter_map(|c| c.get_clone())
     }
+}
+
+impl<T: WeakRefTrait + Clone, A: AsRef<[Slot<T>]>> CellSet<T, A> {
+    pub fn iter_ref(&self) -> impl Iterator<Item = T::Strong> + '_ { self.iter_clone().filter_map(|r| r.upgrade()) }
 }
 
 impl<T: PartialEq, A: AsRef<[Slot<T>]>> CellSet<T, A> {
