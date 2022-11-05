@@ -74,7 +74,7 @@ fn main() {
     let game = Box::leak(Box::new(TCell::<Game, Game>::new(Game::default())));
     let p1 = &add_player(game, &mut go, "Sune");
     let p2 = &add_player(game, &mut go, "Berra");
-    let index = p1.rw(&mut po).friends.push(p2.clone());
+    p1.rw(&mut po).friends.push(p2.clone());
     p2.rw(&mut po).friends.push(p1.clone());
     //assert_eq!(p1.ro(&po).game, p2.ro(&po).game);
     //assert_eq!(p1.friends.get(index), Some(p2));

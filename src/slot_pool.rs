@@ -212,7 +212,7 @@ impl<T: Clear, A: AsRef<[Slot<T>]>> Clear for SlotPool<T, A> {
 
             if slot.version.get() >= 0 {
                 unsafe { slot.get().clear() };
-                slot.version.set(-(i as i32 + 2));
+                slot.version.set(-(i + 2));
             }
         }
 

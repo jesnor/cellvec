@@ -1,0 +1,8 @@
+binop_separator = "Back"
+chain_width = 112
+fn_call_width = 112
+fn_single_line = true
+indent_style = "Block"
+max_width = 120
+single_line_if_else_max_width = 112
+struct_field_align_threshold = 60

@@ -51,7 +51,7 @@ fn main() {
     let game = Box::leak(Game::new(100).into());
     let p1 = game.add_player("Sune");
     let p2 = game.add_player("Berra");
-    let index = p1.friends.insert(p2.clone()).unwrap();
+    let _ = p1.friends.insert(p2.clone()).unwrap();
     p2.friends.insert(p1.clone()).unwrap();
     assert_eq!(p1.game, p2.game);
     //    assert_eq!(p1.friends.get_clone(index), Some(p2));

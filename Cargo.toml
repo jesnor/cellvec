@@ -4,8 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-array-init = "2.0.0"
-qcell = "0.5.0"
+array-init = "2.0"
+
+[dev-dependencies]
+qcell = "0.5"
 
 [[example]]
 name = "game"

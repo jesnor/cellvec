@@ -4,7 +4,7 @@ use cellvec::{
     clear::Clear,
     mcell::MCell,
     ptr::Ptr,
-    slot_pool::{SlotPoolRef, SlotPool, VecSlotPool},
+    slot_pool::{SlotPool, SlotPoolRef, VecSlotPool},
 };
 use std::cell::Cell;
 

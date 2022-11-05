@@ -3,8 +3,6 @@ use std::{
     ops::{AddAssign, DivAssign, MulAssign, Neg, RemAssign, SubAssign},
 };
 
-use crate::mcell::MCell;
-
 pub trait CellTrait<T> {
     fn as_ptr(&self) -> *mut T;
     fn set(&self, value: T);
@@ -75,18 +73,6 @@ pub trait CellTrait<T> {
 }
 
 impl<T> CellTrait<T> for Cell<T> {
-    fn as_ptr(&self) -> *mut T { self.as_ptr() }
-    fn set(&self, value: T) { self.set(value) }
-
-    fn take(&self) -> T
-    where
-        T: Default,
-    {
-        self.take()
-    }
-}
-
-impl<T> CellTrait<T> for MCell<T> {
     fn as_ptr(&self) -> *mut T { self.as_ptr() }
     fn set(&self, value: T) { self.set(value) }
 

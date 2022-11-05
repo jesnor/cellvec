@@ -1,5 +1,4 @@
 use crate::mcell::MCell;
-use crate::rc_pool::{StrongRef, WeakRef};
 use crate::refs::WeakRefTrait;
 use crate::{cell_trait::CellTrait, clear::Clear};
 use std::{cell::Cell, fmt::Debug, marker::PhantomData};

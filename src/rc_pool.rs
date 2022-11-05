@@ -273,7 +273,7 @@ impl<T: Clear, A: AsRef<[Slot<T>]>> Clear for RcPool<T, A> {
 
         for i in 0..last {
             let slot = unsafe { self.slots.as_ref().get_unchecked(i as usize) };
-            slot.version.set(-(i as i32 + 2));
+            slot.version.set(-(i + 2));
             slot.drop_elem();
         }
     }

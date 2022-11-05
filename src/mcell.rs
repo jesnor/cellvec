@@ -2,8 +2,10 @@ use std::cell::Cell;
 use std::fmt::{Debug, Display};
 use std::ops::{AddAssign, DivAssign, MulAssign, Neg, RemAssign, SubAssign};
 
+use crate::cell_trait::CellTrait;
 use crate::safe_traits::SafeTraits;
 
+/// Cell wrapper with some convenience methods
 pub struct MCell<T> {
     cell: Cell<T>,
 }
@@ -99,4 +101,17 @@ impl<T: Default> Default for MCell<T> {
 
 impl<T> From<T> for MCell<T> {
     fn from(value: T) -> Self { Self::new(value) }
+}
+
+impl<T> CellTrait<T> for MCell<T> {
+    fn as_ptr(&self) -> *mut T { self.cell.as_ptr() }
+
+    fn set(&self, value: T) { self.set(value) }
+
+    fn take(&self) -> T
+    where
+        T: Default,
+    {
+        self.take()
+    }
 }
