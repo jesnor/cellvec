@@ -17,7 +17,7 @@ pub trait WeakRefTrait {
 
 impl<T> StrongRefTrait for Rc<T> {
     type Weak = Weak<T>;
-    fn downgrade(&self) -> Self::Weak { todo!() }
+    fn downgrade(&self) -> Self::Weak { Rc::downgrade(self) }
 }
 
 impl<T> WeakRefTrait for Weak<T> {
