@@ -170,11 +170,11 @@ impl<T, A: AsRef<[Slot<T>]>> SlotPool<T, A> {
     }
 
     #[must_use]
-    pub fn alloc(&self, factory: impl FnOnce() -> T) -> Option<SlotPoolRef<T>> {
+    pub fn insert(&self, value: T) -> Option<SlotPoolRef<T>> {
         let index = self.first_free.get();
-        let v = self.version.get();
 
         if let Some(slot) = self.slots.as_ref().get(index as usize) {
+            let v = self.version.get();
             self.first_free.set(-slot.version.get() - 1);
             self.version.set(v.wrapping_add(1) & i32::MAX);
             slot.version.set(v);
@@ -182,7 +182,7 @@ impl<T, A: AsRef<[Slot<T>]>> SlotPool<T, A> {
 
             if index >= self.last_init.get() {
                 self.last_init.set(index);
-                unsafe { (*slot.elem.get()).write(factory()) };
+                unsafe { slot.elem.get().write(MaybeUninit::new(value)) };
             }
 
             Some(SlotPoolRef::new(slot, v))
@@ -192,26 +192,26 @@ impl<T, A: AsRef<[Slot<T>]>> SlotPool<T, A> {
     }
 }
 
-impl<T: Clear, A: AsRef<[Slot<T>]>> SlotPool<T, A> {
+impl<T, A: AsRef<[Slot<T>]>> SlotPool<T, A> {
     pub fn remove(&self, r: &SlotPoolRef<T>) {
         if r.is_valid() {
             let index = self.index_of(r.slot);
             let ff = self.first_free.get();
             r.slot.version.set(-ff - 1);
-            r.clear();
+            unsafe { (*r.slot.elem.get()).assume_init_drop() };
             self.first_free.set(index as i32);
             self.last.set(self.last.get().min(index as i32 + 1));
         }
     }
 }
 
-impl<T: Clear, A: AsRef<[Slot<T>]>> Clear for SlotPool<T, A> {
+impl<T, A: AsRef<[Slot<T>]>> Clear for SlotPool<T, A> {
     fn clear(&self) {
         for i in 0..self.last.get() {
             let slot = unsafe { self.slots.as_ref().get_unchecked(i as usize) };
 
             if slot.version.get() >= 0 {
-                unsafe { slot.get().clear() };
+                unsafe { (*slot.elem.get()).assume_init_drop() };
                 slot.version.set(-(i + 2));
             }
         }
