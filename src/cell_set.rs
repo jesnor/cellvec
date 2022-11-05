@@ -160,6 +160,6 @@ impl<T, A: AsRef<[Slot<T>]>> Debug for CellSet<T, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { f.debug_struct("CellSet").finish() }
 }
 
-impl<T, const CAP: usize> Default for CellSet<T, [Slot<T>; CAP]> {
-    fn default() -> Self { Self::new_array() }
+impl<T, A: AsRef<[Slot<T>]> + Default> Default for CellSet<T, A> {
+    fn default() -> Self { Self::new(A::default()) }
 }
