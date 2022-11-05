@@ -1,6 +1,7 @@
 use cellvec::{
     cell_set::ArrayCellSet,
     cell_trait::CellTrait,
+    clear::Clear,
     mcell::MCell,
     ptr::Ptr,
     slot_pool::{SlotPool, SlotPoolRef, VecSlotPool},
@@ -27,6 +28,13 @@ impl<'t> Player<'t> {
 
 type PlayerRef<'t> = SlotPoolRef<'t, Player<'t>>;
 
+impl<'t> Clear for Player<'t> {
+    fn clear(&self) {
+        self.name.clear();
+        self.friends.clear();
+    }
+}
+
 struct Game<'t> {
     players: VecSlotPool<Player<'t>>,
 }
@@ -41,7 +49,7 @@ impl<'t> Game<'t> {
     }
 
     fn add_player(&'t self, name: &str) -> PlayerRef<'t> {
-        let p = self.players.insert(Player::new(Ptr::new(self))).unwrap();
+        let p = self.players.alloc(|| Player::new(Ptr::new(self))).unwrap();
         p.name.set(name.into());
         p
     }

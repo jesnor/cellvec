@@ -22,6 +22,10 @@ impl<T> CellSet<T, Vec<Slot<T>>> {
     }
 }
 
+impl<T, const CAP: usize> CellSet<T, [Slot<T>; CAP]> {
+    pub fn new_array() -> Self { Self::new(array_init::array_init(|_| Slot::default())) }
+}
+
 impl<T, A: AsRef<[Slot<T>]>> CellSet<T, A> {
     #[must_use]
     pub fn new(slots: A) -> Self {
@@ -156,6 +160,6 @@ impl<T, A: AsRef<[Slot<T>]>> Debug for CellSet<T, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { f.debug_struct("CellSet").finish() }
 }
 
-impl<T, A: AsRef<[Slot<T>]> + Default> Default for CellSet<T, A> {
-    fn default() -> Self { Self::new(A::default()) }
+impl<T, const CAP: usize> Default for CellSet<T, [Slot<T>; CAP]> {
+    fn default() -> Self { Self::new_array() }
 }
