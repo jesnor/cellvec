@@ -3,7 +3,6 @@ use crate::clear::Clear;
 use crate::refs::WeakRefTrait;
 use std::fmt::Debug;
 use std::marker::PhantomData;
-use std::ptr;
 use std::{
     cell::{Cell, UnsafeCell},
     mem::MaybeUninit,
@@ -33,7 +32,7 @@ impl<T> Slot<T> {
             panic!("Trying to remove item with references!")
         }
 
-        unsafe { ptr::drop_in_place(self.elem.get()) };
+        unsafe { (*self.elem.get()).assume_init_drop() };
     }
 }
 
@@ -178,11 +177,6 @@ impl<T> RcPool<T, Vec<Slot<T>>> {
     }
 }
 
-impl<T, const CAP: usize> RcPool<T, [Slot<T>; CAP]> {
-    #[must_use]
-    pub fn new_array() -> Self { Self::new(array_init::array_init(|_| Slot::default())) }
-}
-
 impl<T, A: AsRef<[Slot<T>]>> RcPool<T, A> {
     #[must_use]
     pub fn new(slots: A) -> Self {
@@ -279,6 +273,6 @@ impl<T: Clear, A: AsRef<[Slot<T>]>> Clear for RcPool<T, A> {
     }
 }
 
-impl<T, const CAP: usize> Default for RcPool<T, [Slot<T>; CAP]> {
-    fn default() -> Self { Self::new_array() }
+impl<T, A: AsRef<[Slot<T>]> + Default> Default for RcPool<T, A> {
+    fn default() -> Self { Self::new(A::default()) }
 }

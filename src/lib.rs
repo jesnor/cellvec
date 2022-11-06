@@ -9,4 +9,3 @@ pub mod ptr_cell;
 pub mod rc_pool;
 pub mod refs;
 pub mod safe_traits;
-pub mod slot_pool;
