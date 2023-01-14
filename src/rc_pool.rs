@@ -19,20 +19,22 @@ impl<T> Slot<T> {
     #[must_use]
     unsafe fn get(&self) -> &T { (*self.elem.get()).assume_init_ref() }
 
-    fn default() -> Self {
-        Self {
-            elem:      UnsafeCell::new(MaybeUninit::uninit()),
-            version:   Default::default(),
-            ref_count: Default::default(),
-        }
-    }
-
     fn drop_elem(&self) {
         if self.ref_count.get() > 0 {
             panic!("Trying to remove item with references!")
         }
 
         unsafe { (*self.elem.get()).assume_init_drop() };
+    }
+}
+
+impl<T> Default for Slot<T> {
+    fn default() -> Self {
+        Self {
+            elem:      UnsafeCell::new(MaybeUninit::uninit()),
+            version:   Default::default(),
+            ref_count: Default::default(),
+        }
     }
 }
 
@@ -195,14 +197,22 @@ impl<T, A: AsRef<[Slot<T>]>> RcPool<T, A> {
     }
 
     #[must_use]
-    pub fn get(&self, index: usize) -> Option<&T> {
-        self.slots.as_ref().get(index).and_then(|e| if e.version.get() >= 0 { Some(unsafe { e.get() }) } else { None })
+    pub fn get(&self, index: usize) -> Option<StrongRef<T>> {
+        self.slots.as_ref().get(index).and_then(
+            |slot| {
+                if slot.version.get() >= 0 {
+                    Some(StrongRef { slot })
+                } else {
+                    None
+                }
+            },
+        )
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = &T> {
-        self.slots.as_ref().iter().take(self.last.get() as usize).filter_map(|e| {
-            if e.version.get() >= 0 {
-                Some(unsafe { e.get() })
+    pub fn iter(&self) -> impl Iterator<Item = StrongRef<T>> {
+        self.slots.as_ref().iter().take(self.last.get() as usize).filter_map(|slot| {
+            if slot.version.get() >= 0 {
+                Some(StrongRef { slot })
             } else {
                 None
             }
