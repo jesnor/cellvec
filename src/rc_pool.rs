@@ -3,11 +3,14 @@ use crate::clear::Clear;
 use crate::refs::WeakRefTrait;
 use std::fmt::Debug;
 use std::marker::PhantomData;
+use std::ops::DerefMut;
 use std::{
     cell::{Cell, UnsafeCell},
     mem::MaybeUninit,
     ops::Deref,
 };
+
+const MUT_REF_COUNT: u32 = u32::MAX;
 
 pub struct Slot<T> {
     elem:      UnsafeCell<MaybeUninit<T>>,
@@ -18,6 +21,10 @@ pub struct Slot<T> {
 impl<T> Slot<T> {
     #[must_use]
     unsafe fn get(&self) -> &T { (*self.elem.get()).assume_init_ref() }
+
+    #[must_use]
+    #[allow(clippy::mut_from_ref)]
+    unsafe fn get_mut(&self) -> &mut T { (*self.elem.get()).assume_init_mut() }
 
     fn drop_elem(&self) {
         if self.ref_count.get() > 0 {
@@ -38,17 +45,49 @@ impl<T> Default for Slot<T> {
     }
 }
 
+pub struct RefMut<'t, 'u, T> {
+    r: &'t mut StrongRef<'u, T>,
+}
+
+impl<'t, 'u, T> Deref for RefMut<'t, 'u, T> {
+    type Target = T;
+    fn deref(&self) -> &Self::Target { unsafe { self.r.slot.get() } }
+}
+
+impl<'t, 'u, T> DerefMut for RefMut<'t, 'u, T> {
+    fn deref_mut(&mut self) -> &mut Self::Target { unsafe { self.r.slot.get_mut() } }
+}
+
+impl<'t, 'u, T> Drop for RefMut<'t, 'u, T> {
+    fn drop(&mut self) { self.r.slot.ref_count.set(1) }
+}
+
 pub struct StrongRef<'t, T> {
     slot: &'t Slot<T>,
 }
 
 impl<'t, T> StrongRef<'t, T> {
     fn new(slot: &'t Slot<T>) -> Self {
+        assert_ne!(slot.ref_count.get(), MUT_REF_COUNT);
         slot.ref_count.add(1);
         Self { slot }
     }
 
     pub fn weak(&self) -> WeakRef<'t, T> { WeakRef::new(self.slot) }
+    pub fn is_unique(&self) -> bool { self.slot.ref_count.get() == 1 }
+
+    pub fn borrow_mut<'u>(&'u mut self) -> RefMut<'u, 't, T> {
+        self.try_borrow_mut().expect("More than one strong reference!")
+    }
+
+    pub fn try_borrow_mut<'u>(&'u mut self) -> Option<RefMut<'u, 't, T>> {
+        if self.is_unique() {
+            self.slot.ref_count.set(MUT_REF_COUNT);
+            Some(RefMut { r: self })
+        } else {
+            None
+        }
+    }
 }
 
 impl<'t, T> Clone for StrongRef<'t, T> {
@@ -212,7 +251,7 @@ impl<T, A: AsRef<[Slot<T>]>> RcPool<T, A> {
     pub fn iter(&self) -> impl Iterator<Item = StrongRef<T>> {
         self.slots.as_ref().iter().take(self.last.get() as usize).filter_map(|slot| {
             if slot.version.get() >= 0 {
-                Some(StrongRef { slot })
+                Some(StrongRef::new(slot))
             } else {
                 None
             }
@@ -250,7 +289,8 @@ impl<T, A: AsRef<[Slot<T>]>> RcPool<T, A> {
             slot.version.set(v);
             self.last.set(self.last.get().max(index + 1));
             unsafe { (*slot.elem.get()).write(value) };
-            Some(StrongRef::new(slot))
+            slot.ref_count.set(1);
+            Some(StrongRef { slot })
         } else {
             None
         }
