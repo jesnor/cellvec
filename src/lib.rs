@@ -1,6 +1,9 @@
 pub mod cell_set;
 pub mod cell_trait;
 pub mod clear;
+pub mod clone_cell;
+pub mod clone_map;
+pub mod clone_vec;
 pub mod default_cell;
 pub mod index;
 pub mod mcell;

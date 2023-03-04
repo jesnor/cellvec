@@ -51,8 +51,8 @@ fn main() {
         let mut p1 = game.add_player("Sune");
         let p2 = game.add_player("Berra");
 
-        let _ = p1.friends.insert(p2.downgrade()).unwrap();
-        p2.friends.insert(p1.downgrade()).unwrap();
+        let _ = p1.friends.insert(p2.weak()).unwrap();
+        p2.friends.insert(p1.weak()).unwrap();
         assert_eq!(p1.game, p2.game);
         //assert_eq!(p1.friends.get(index), Some(p2));
 

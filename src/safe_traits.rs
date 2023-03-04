@@ -1,5 +1,6 @@
 use std::{
     cell::{Cell, RefCell},
+    collections::{hash_map::RandomState, HashMap},
     rc::{Rc, Weak},
 };
 
@@ -40,3 +41,7 @@ unsafe impl<T: SafeTraits> SafeTraits for Option<T> {}
 unsafe impl<T: SafeTraits> SafeTraits for Cell<T> {}
 unsafe impl<T: SafeTraits> SafeTraits for MCell<T> {}
 unsafe impl<T: SafeTraits> SafeTraits for RefCell<T> {}
+
+unsafe impl<K: SafeTraits, V: SafeTraits, S: SafeTraits> SafeTraits for HashMap<K, V, S> {}
+unsafe impl<T: SafeTraits> SafeTraits for Vec<T> {}
+unsafe impl SafeTraits for RandomState {}
