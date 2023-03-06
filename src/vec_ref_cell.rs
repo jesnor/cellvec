@@ -104,7 +104,7 @@ impl<T: SafeTraits> VecCellTrait<T> for VecRefCell<T> {
     where
         T: Clone,
     {
-        Self::Entry::new(self, index, self.get(index).unwrap())
+        Self::Entry::new(self, index)
     }
 
     type EntryIter<'t> = VecCellEntryIter<'t, Self, T> 

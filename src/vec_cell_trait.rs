@@ -1,10 +1,9 @@
-use std::{collections::TryReserveError, marker::PhantomData, ops::Deref, slice::SliceIndex};
+use crate::var::Var;
+use std::{collections::TryReserveError, marker::PhantomData, slice::SliceIndex};
 
-pub trait VecCellEntry<'t, T>: Deref<Target = T> {
+pub trait VecCellEntry<'t, T>: Var<T> {
     fn index(&self) -> usize;
-    fn set(&self, v: T);
     fn remove(&self) -> T;
-    fn take(self) -> T;
 }
 
 pub trait VecCellTrait<T> {
@@ -115,25 +114,35 @@ impl<'t, T: Clone, V: VecCellTrait<T>> Iterator for VecCellIter<'t, V, T> {
 }
 
 pub struct VecCellEntryImpl<'t, V, T> {
-    vec:   &'t V,
-    index: usize,
-    elem:  T,
+    vec:      &'t V,
+    index:    usize,
+    _phantom: PhantomData<T>,
 }
 
 impl<'t, V: VecCellTrait<T>, T> VecCellEntryImpl<'t, V, T> {
-    pub fn new(vec: &'t V, index: usize, elem: T) -> Self { Self { vec, index, elem } }
+    pub fn new(vec: &'t V, index: usize) -> Self {
+        Self {
+            vec,
+            index,
+            _phantom: PhantomData::default(),
+        }
+    }
+}
+
+impl<'t, V: VecCellTrait<T>, T> Var<T> for VecCellEntryImpl<'t, V, T> {
+    fn set(&self, value: T) { self.vec.set(self.index, value) }
+
+    fn get(&self) -> T
+    where
+        T: Clone,
+    {
+        self.vec.get(self.index).unwrap()
+    }
 }
 
 impl<'t, V: VecCellTrait<T>, T> VecCellEntry<'t, T> for VecCellEntryImpl<'t, V, T> {
     fn index(&self) -> usize { self.index }
-    fn set(&self, value: T) { self.vec.set(self.index, value) }
     fn remove(&self) -> T { self.vec.remove(self.index) }
-    fn take(self) -> T { self.elem }
-}
-
-impl<'t, V, T> Deref for VecCellEntryImpl<'t, V, T> {
-    type Target = T;
-    fn deref(&self) -> &Self::Target { &self.elem }
 }
 
 pub struct VecCellEntryIter<'t, V, T> {
@@ -156,13 +165,17 @@ impl<'t, T: Clone, V: VecCellTrait<T>> Iterator for VecCellEntryIter<'t, V, T> {
     type Item = VecCellEntryImpl<'t, V, T>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let r = self.vec.get(self.index).map(|elem| VecCellEntryImpl {
-            vec: self.vec,
-            index: self.index,
-            elem,
-        });
+        if self.index < self.vec.len() {
+            let r = VecCellEntryImpl {
+                vec:      self.vec,
+                index:    self.index,
+                _phantom: PhantomData::default(),
+            };
 
-        self.index += 1;
-        r
+            self.index += 1;
+            Some(r)
+        } else {
+            None
+        }
     }
 }

@@ -1,8 +1,4 @@
-use cellvec::{
-    vec_cell::VecCell,
-    vec_cell_trait::{VecCellEntry, VecCellTrait},
-    vec_ref_cell::VecRefCell,
-};
+use cellvec::{var::Var, vec_cell::VecCell, vec_cell_trait::VecCellTrait, vec_ref_cell::VecRefCell};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 fn vec(size: usize, sum: &mut usize) {
@@ -33,7 +29,7 @@ fn vec_cell<V: VecCellTrait<usize>>(size: usize, sum: &mut usize) {
     }
 
     for e in v.entries().step_by(3) {
-        e.set(*e + 5);
+        e.set(e.get() + 5);
     }
 
     let mut s = 0;

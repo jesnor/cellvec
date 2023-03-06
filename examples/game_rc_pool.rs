@@ -2,7 +2,6 @@ use cellvec::{
     cell_set::ArrayCellSet,
     ptr::Ptr,
     rc_pool::{RcPool, StrongRef, VecRcPool, WeakRef},
-    refs::StrongRefTrait,
 };
 
 struct Player<'t> {

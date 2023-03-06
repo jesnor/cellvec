@@ -10,6 +10,7 @@ pub mod ptr_cell;
 pub mod rc_pool;
 pub mod refs;
 pub mod safe_traits;
+pub mod var;
 pub mod vec_cell;
 pub mod vec_cell_trait;
 pub mod vec_ref_cell;
