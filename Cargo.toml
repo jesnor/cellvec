@@ -8,6 +8,7 @@ array-init = "2.0"
 
 [dev-dependencies]
 qcell = "0.5"
+criterion = "0.4"
 
 [[example]]
 name = "game_rc"
@@ -17,3 +18,7 @@ name = "game_rc_pool"
 
 [[example]]
 name = "game_tcell"
+
+[[bench]]
+name = "vec"
+harness = false

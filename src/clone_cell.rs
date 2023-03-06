@@ -17,8 +17,8 @@ impl<T> From<T> for CloneCell<T> {
     fn from(v: T) -> Self { Self(UnsafeCell::new(v)) }
 }
 
-impl<T: PartialEq + SafeTraits> PartialEq for CloneCell<T> {
-    fn eq(&self, other: &Self) -> bool { unsafe { self.get_ref() == other.get_ref() } }
+impl<U, T: PartialEq<U> + SafeTraits> PartialEq<CloneCell<U>> for CloneCell<T> {
+    fn eq(&self, other: &CloneCell<U>) -> bool { unsafe { self.get_ref() == other.get_ref() } }
 }
 
 impl<T: Eq + SafeTraits> Eq for CloneCell<T> {}
