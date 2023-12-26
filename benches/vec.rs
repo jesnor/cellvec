@@ -1,10 +1,10 @@
 use cellvec::{var::Var, vec_cell::VecCell, vec_cell_trait::VecCellTrait, vec_ref_cell::VecRefCell};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
-fn vec(size: usize, sum: &mut usize) {
-    let mut v = Vec::with_capacity(size);
+fn vec(v: &mut Vec<usize>, sum: &mut usize) {
+    v.clear();
 
-    for i in 0..size {
+    for i in 0..v.capacity() {
         v.push(i * 2 + 1);
     }
 
@@ -21,10 +21,10 @@ fn vec(size: usize, sum: &mut usize) {
     *sum = s;
 }
 
-fn vec_cell<V: VecCellTrait<usize>>(size: usize, sum: &mut usize) {
-    let v = V::with_capacity(size);
+fn vec_cell<V: VecCellTrait<usize>>(v: &V, sum: &mut usize) {
+    v.clear();
 
-    for i in 0..size {
+    for i in 0..v.capacity() {
         v.push(i * 2 + 1);
     }
 
@@ -42,16 +42,15 @@ fn vec_cell<V: VecCellTrait<usize>>(size: usize, sum: &mut usize) {
 }
 
 pub fn criterion_benchmark(c: &mut Criterion) {
-    let count = 1_000_000;
+    let size = 100_000;
+    let mut v1 = Vec::with_capacity(size);
+    let v2 = VecCell::with_capacity(size);
+    let v3 = VecRefCell::with_capacity(size);
     let mut s = [0; 3];
 
-    c.bench_function("vec cell", |b| b.iter(|| vec_cell::<VecCell<usize>>(black_box(count), black_box(&mut s[0]))));
-
-    c.bench_function("vec ref cell", |b| {
-        b.iter(|| vec_cell::<VecRefCell<usize>>(black_box(count), black_box(&mut s[1])))
-    });
-
-    c.bench_function("vec", |b| b.iter(|| vec(black_box(count), black_box(&mut s[2]))));
+    c.bench_function("vec", |b| b.iter(|| vec(black_box(&mut v1), black_box(&mut s[2]))));
+    c.bench_function("vec cell", |b| b.iter(|| vec_cell(black_box(&v2), black_box(&mut s[0]))));
+    c.bench_function("vec ref cell", |b| b.iter(|| vec_cell(black_box(&v3), black_box(&mut s[1]))));
 
     for v in s {
         println!("{v}");

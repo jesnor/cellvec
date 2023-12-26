@@ -31,9 +31,7 @@ impl<T: ?Sized> PartialEq for PtrCell<&T> {
 impl<T: ?Sized> Eq for PtrCell<&T> {}
 
 impl<T: ?Sized> PartialOrd for PtrCell<&T> {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        (self.cell.get() as *const T).partial_cmp(&(other.cell.get() as *const T))
-    }
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> { Some(self.cmp(other)) }
 }
 
 impl<T: ?Sized> Ord for PtrCell<&T> {

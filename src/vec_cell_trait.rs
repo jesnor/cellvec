@@ -94,11 +94,12 @@ pub struct VecCellIter<'t, V, T> {
 }
 
 impl<'t, V, T> VecCellIter<'t, V, T> {
+    #[inline(always)]
     pub(crate) fn new(vec: &'t V) -> Self {
         Self {
             vec,
             index: 0,
-            _phantom: PhantomData::default(),
+            _phantom: PhantomData,
         }
     }
 }
@@ -106,6 +107,7 @@ impl<'t, V, T> VecCellIter<'t, V, T> {
 impl<'t, T: Clone, V: VecCellTrait<T>> Iterator for VecCellIter<'t, V, T> {
     type Item = T;
 
+    #[inline(always)]
     fn next(&mut self) -> Option<Self::Item> {
         let r = self.vec.get(self.index);
         self.index += 1;
@@ -120,18 +122,21 @@ pub struct VecCellEntryImpl<'t, V, T> {
 }
 
 impl<'t, V: VecCellTrait<T>, T> VecCellEntryImpl<'t, V, T> {
+    #[inline(always)]
     pub fn new(vec: &'t V, index: usize) -> Self {
         Self {
             vec,
             index,
-            _phantom: PhantomData::default(),
+            _phantom: PhantomData,
         }
     }
 }
 
 impl<'t, V: VecCellTrait<T>, T> Var<T> for VecCellEntryImpl<'t, V, T> {
+    #[inline(always)]
     fn set(&self, value: T) { self.vec.set(self.index, value) }
 
+    #[inline(always)]
     fn get(&self) -> T
     where
         T: Clone,
@@ -141,7 +146,10 @@ impl<'t, V: VecCellTrait<T>, T> Var<T> for VecCellEntryImpl<'t, V, T> {
 }
 
 impl<'t, V: VecCellTrait<T>, T> VecCellEntry<'t, T> for VecCellEntryImpl<'t, V, T> {
+    #[inline(always)]
     fn index(&self) -> usize { self.index }
+
+    #[inline(always)]
     fn remove(&self) -> T { self.vec.remove(self.index) }
 }
 
@@ -152,11 +160,12 @@ pub struct VecCellEntryIter<'t, V, T> {
 }
 
 impl<'t, V, T> VecCellEntryIter<'t, V, T> {
+    #[inline(always)]
     pub(crate) fn new(vec: &'t V) -> Self {
         Self {
             vec,
             index: 0,
-            _phantom: PhantomData::default(),
+            _phantom: PhantomData,
         }
     }
 }
@@ -164,12 +173,13 @@ impl<'t, V, T> VecCellEntryIter<'t, V, T> {
 impl<'t, T: Clone, V: VecCellTrait<T>> Iterator for VecCellEntryIter<'t, V, T> {
     type Item = VecCellEntryImpl<'t, V, T>;
 
+    #[inline(always)]
     fn next(&mut self) -> Option<Self::Item> {
         if self.index < self.vec.len() {
             let r = VecCellEntryImpl {
                 vec:      self.vec,
                 index:    self.index,
-                _phantom: PhantomData::default(),
+                _phantom: PhantomData,
             };
 
             self.index += 1;

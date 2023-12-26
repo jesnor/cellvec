@@ -37,15 +37,11 @@ impl<'t, T> Hash for Ptr<&'t mut T> {
 }
 
 impl<'t, T> PartialOrd for Ptr<&'t T> {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        (self.value as *const T).partial_cmp(&(other.value as *const T))
-    }
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> { Some(self.cmp(other)) }
 }
 
 impl<'t, T> PartialOrd for Ptr<&'t mut T> {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        (self.value as *const T).partial_cmp(&(other.value as *const T))
-    }
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> { Some(self.cmp(other)) }
 }
 
 impl<'t, T> Ord for Ptr<&'t T> {

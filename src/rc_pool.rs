@@ -171,12 +171,7 @@ impl<'t, T> Eq for WeakRef<'t, T> {}
 
 impl<'t, T> Clone for WeakRef<'t, T> {
     #[must_use]
-    fn clone(&self) -> Self {
-        Self {
-            slot:    self.slot,
-            version: self.version,
-        }
-    }
+    fn clone(&self) -> Self { *self }
 }
 
 impl<'t, T> Copy for WeakRef<'t, T> {}
@@ -269,7 +264,7 @@ impl<T, A: AsRef<[Slot<T>]>> RcPool<T, A> {
 
     #[must_use]
     fn index_of(&self, slot: &Slot<T>) -> usize {
-        let index = unsafe { (slot as *const Slot<T>).offset_from(self.slots.as_ref().as_ptr() as *const Slot<T>) };
+        let index = unsafe { (slot as *const Slot<T>).offset_from(self.slots.as_ref().as_ptr()) };
 
         if index < 0 || index as usize >= self.capacity() {
             panic!();

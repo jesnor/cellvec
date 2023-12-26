@@ -12,7 +12,7 @@ impl<Q, T> RcTCell<Q, T> {
         }
     }
 
-    pub fn ro<'a>(&'a self, owner: &'a Owner<Q>) -> &'a T { owner.owner.ro(self.rc.deref()) }
+    pub fn _ro<'a>(&'a self, owner: &'a Owner<Q>) -> &'a T { owner.owner.ro(self.rc.deref()) }
     pub fn rw<'a>(&'a self, owner: &'a mut Owner<Q>) -> &'a mut T { owner.owner.rw(self.rc.deref()) }
 }
 
@@ -36,7 +36,7 @@ impl<Q: 'static> Owner<Q> {
 }
 
 struct Player {
-    game:    GameRef,
+    _game:   GameRef,
     name:    String,
     health:  i32,
     friends: Vec<PlayerRef>,
@@ -57,7 +57,7 @@ fn add_player(game_ref: GameRef, go: &mut GameOwner, name: &str) -> PlayerRef {
     let game = game_ref.rw(go);
 
     let p: PlayerRef = PlayerRef::new(Player {
-        game:    game_ref,
+        _game:   game_ref,
         name:    name.into(),
         health:  4,
         friends: Default::default(),
